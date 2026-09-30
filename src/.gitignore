@@ -116,3 +116,6 @@ UpgradeLog*.htm
 *.dll
 !/RequiredPackages/*.dll
 
+
+# BenchmarkDotNet
+BenchmarkDotNet.Artifacts/
