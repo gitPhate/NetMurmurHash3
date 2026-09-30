@@ -30,17 +30,39 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
         Reset();
     }
 
-    public static byte[] Hash(ReadOnlySpan<byte> data, uint seed = 0)
+    public static byte[] Hash(ReadOnlySpan<byte> source, uint seed = 0)
     {
-        ulong h1 = seed;
-        ulong h2 = seed;
-        int blocksLength = data.Length & ~(BlockSize - 1);
-        MixBlocks(data.Slice(0, blocksLength), ref h1, ref h2);
-
         byte[] hash = new byte[HashSize];
-        Finish(h1, h2, data.Slice(blocksLength), (ulong)data.Length, hash);
+        BinaryPrimitives.WriteUInt128LittleEndian(hash, HashCore(source, seed));
         return hash;
     }
+
+    /// <exception cref="ArgumentException"><paramref name="destination"/> is shorter than 16 bytes.</exception>
+    public static int Hash(ReadOnlySpan<byte> source, Span<byte> destination, uint seed = 0)
+    {
+        if (!TryHash(source, destination, out int bytesWritten, seed))
+        {
+            throw new ArgumentException("Destination is too short.", nameof(destination));
+        }
+
+        return bytesWritten;
+    }
+
+    public static bool TryHash(ReadOnlySpan<byte> source, Span<byte> destination, out int bytesWritten, uint seed = 0)
+    {
+        if (destination.Length < HashSize)
+        {
+            bytesWritten = 0;
+            return false;
+        }
+
+        BinaryPrimitives.WriteUInt128LittleEndian(destination, HashCore(source, seed));
+        bytesWritten = HashSize;
+        return true;
+    }
+
+    /// <summary>Returns h2 as the upper and h1 as the lower 64 bits, so writing it little-endian yields the <see cref="Hash(ReadOnlySpan{byte}, uint)"/> bytes.</summary>
+    public static UInt128 HashToUInt128(ReadOnlySpan<byte> source, uint seed = 0) => HashCore(source, seed);
 
     public override void Append(ReadOnlySpan<byte> data)
     {
@@ -78,10 +100,23 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
         _length = 0;
     }
 
-    protected override void GetCurrentHashCore(Span<byte> destination) =>
-        Finish(_h1, _h2, _pending[.._pendingCount], _length, destination);
+    /// <summary>Returns h2 as the upper and h1 as the lower 64 bits, so writing it little-endian yields the <see cref="NonCryptographicHashAlgorithm.GetCurrentHash()"/> bytes.</summary>
+    public UInt128 GetCurrentHashAsUInt128() => Finish(_h1, _h2, _pending[.._pendingCount], _length);
 
-    private static void Finish(ulong h1, ulong h2, ReadOnlySpan<byte> tail, ulong length, Span<byte> destination)
+    protected override void GetCurrentHashCore(Span<byte> destination) =>
+        BinaryPrimitives.WriteUInt128LittleEndian(destination, GetCurrentHashAsUInt128());
+
+    private static UInt128 HashCore(ReadOnlySpan<byte> source, uint seed)
+    {
+        ulong h1 = seed;
+        ulong h2 = seed;
+        int blocksLength = source.Length & ~(BlockSize - 1);
+        MixBlocks(source.Slice(0, blocksLength), ref h1, ref h2);
+
+        return Finish(h1, h2, source.Slice(blocksLength), (ulong)source.Length);
+    }
+
+    private static UInt128 Finish(ulong h1, ulong h2, ReadOnlySpan<byte> tail, ulong length)
     {
         // Zero padding reproduces the reference's byte-by-byte tail assembly.
         BlockBuffer padded = default;
@@ -102,8 +137,7 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
         h1 += h2;
         h2 += h1;
 
-        BinaryPrimitives.WriteUInt64LittleEndian(destination, h1);
-        BinaryPrimitives.WriteUInt64LittleEndian(destination.Slice(8), h2);
+        return new UInt128(h2, h1);
     }
 
     // Works on locals so the JIT keeps the state in registers for the whole loop instead of round-tripping through fields.

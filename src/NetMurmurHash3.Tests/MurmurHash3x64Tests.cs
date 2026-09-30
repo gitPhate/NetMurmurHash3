@@ -28,6 +28,79 @@ namespace NetMurmurHash3.Tests
         }
 
         [Fact]
+        public void HashToUInt128_has_h1_as_lower_and_h2_as_upper_half()
+        {
+            // "hello" hashes to h1 bytes 029BBD41B3A7D8CB and h2 bytes 191DAE486A901E5B, each little-endian.
+            MurmurHash3x64_128.HashToUInt128(Encoding.ASCII.GetBytes("hello"))
+                .Should().Be(new UInt128(0x5B1E906A48AE1D19UL, 0xCBD8A7B341BD9B02UL));
+        }
+
+        [Fact]
+        public void GetCurrentHashAsUInt128_matches_HashToUInt128()
+        {
+            MurmurHash3x64_128 hasher = new(42);
+            hasher.Append(Pattern.AsSpan(0, 20));
+            hasher.Append(Pattern.AsSpan(20, 13));
+
+            hasher.GetCurrentHashAsUInt128().Should().Be(MurmurHash3x64_128.HashToUInt128(Pattern.AsSpan(0, 33), 42));
+        }
+
+        [Fact]
+        public void Hash_into_destination_writes_16_bytes_and_leaves_the_rest()
+        {
+            byte[] destination = Enumerable.Repeat((byte)0xAA, 20).ToArray();
+
+            int written = MurmurHash3x64_128.Hash(Pattern.AsSpan(0, 33), destination, 42);
+
+            written.Should().Be(16);
+            destination.Take(16).Should().Equal(MurmurHash3x64_128.Hash(Pattern.AsSpan(0, 33), 42));
+            destination.Skip(16).Should().AllBeEquivalentTo((byte)0xAA);
+        }
+
+        [Fact]
+        public void Hash_into_short_destination_throws()
+        {
+            Action act = () => MurmurHash3x64_128.Hash(Pattern, new byte[15]);
+
+            act.Should().Throw<ArgumentException>().WithParameterName("destination");
+        }
+
+        [Fact]
+        public void TryHash_into_short_destination_returns_false_and_writes_nothing()
+        {
+            byte[] destination = new byte[15];
+
+            MurmurHash3x64_128.TryHash(Pattern, destination, out int written).Should().BeFalse();
+
+            written.Should().Be(0);
+            destination.Should().OnlyContain(b => b == 0);
+        }
+
+        [Fact]
+        public void TryHash_matches_Hash()
+        {
+            byte[] destination = new byte[16];
+
+            MurmurHash3x64_128.TryHash(Pattern, destination, out int written, 42).Should().BeTrue();
+
+            written.Should().Be(16);
+            destination.Should().Equal(MurmurHash3x64_128.Hash(Pattern, 42));
+        }
+
+        [Fact]
+        public void Hash_into_destination_does_not_allocate()
+        {
+            byte[] data = TestData.Bytes(100);
+            byte[] destination = new byte[16];
+            MurmurHash3x64_128.Hash(data, destination);
+
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            MurmurHash3x64_128.Hash(data, destination);
+
+            (GC.GetAllocatedBytesForCurrentThread() - before).Should().Be(0);
+        }
+
+        [Fact]
         public void Reset_restores_seeded_state()
         {
             MurmurHash3x64_128 hasher = new(42);
