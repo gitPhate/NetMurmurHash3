@@ -18,23 +18,23 @@ namespace NetMurmurHash3.Tests
         [InlineData("The quick brown fox jumps over the lazy dog", "6C1B07BC7BBC4BE347939AC4A93C437A")]
         public void Hash_matches_reference_for_ascii_strings(string input, string expectedHex)
         {
-            Hex(MurmurHash3x64.Hash(Encoding.ASCII.GetBytes(input))).Should().Be(expectedHex);
+            Hex(MurmurHash3x64_128.Hash(Encoding.ASCII.GetBytes(input))).Should().Be(expectedHex);
         }
 
         [Fact]
         public void Hash_with_seed_matches_reference()
         {
-            Hex(MurmurHash3x64.Hash(Encoding.ASCII.GetBytes("hello"), 42)).Should().Be("086FAF60C9B3B8C47ABCEFB075B83423");
+            Hex(MurmurHash3x64_128.Hash(Encoding.ASCII.GetBytes("hello"), 42)).Should().Be("086FAF60C9B3B8C47ABCEFB075B83423");
         }
 
         [Fact]
         public void Reset_restores_seeded_state()
         {
-            MurmurHash3x64 hasher = new(42);
+            MurmurHash3x64_128 hasher = new(42);
             hasher.Append(Pattern.AsSpan(0, 20));
             hasher.Reset();
             hasher.Append(Pattern.AsSpan(0, 20));
-            hasher.GetCurrentHash().Should().Equal(MurmurHash3x64.Hash(Pattern.AsSpan(0, 20), 42));
+            hasher.GetCurrentHash().Should().Equal(MurmurHash3x64_128.Hash(Pattern.AsSpan(0, 20), 42));
         }
 
         // Lengths cover every tail branch (0, 1..8, 9..15) with zero, one and several full 16-byte blocks.
@@ -52,7 +52,7 @@ namespace NetMurmurHash3.Tests
         [InlineData(64, "F0C58C1AF19DD01C9D8CD7D53442BE55")]
         public void Hash_matches_reference_for_block_and_tail_lengths(int length, string expectedHex)
         {
-            Hex(MurmurHash3x64.Hash(Pattern.AsSpan(0, length))).Should().Be(expectedHex);
+            Hex(MurmurHash3x64_128.Hash(Pattern.AsSpan(0, length))).Should().Be(expectedHex);
         }
 
         [Theory]
@@ -65,14 +65,14 @@ namespace NetMurmurHash3.Tests
         public void Incremental_append_in_fixed_chunks_matches_one_shot(int chunkSize)
         {
             byte[] data = TestData.Bytes(1003);
-            MurmurHash3x64 hasher = new();
+            MurmurHash3x64_128 hasher = new();
 
             for (int offset = 0; offset < data.Length; offset += chunkSize)
             {
                 hasher.Append(data.AsSpan(offset, Math.Min(chunkSize, data.Length - offset)));
             }
 
-            hasher.GetCurrentHash().Should().Equal(MurmurHash3x64.Hash(data));
+            hasher.GetCurrentHash().Should().Equal(MurmurHash3x64_128.Hash(data));
         }
 
         [Fact]
@@ -80,7 +80,7 @@ namespace NetMurmurHash3.Tests
         {
             byte[] data = TestData.Bytes(5000);
             Random random = new(42);
-            MurmurHash3x64 hasher = new();
+            MurmurHash3x64_128 hasher = new();
 
             int offset = 0;
             while (offset < data.Length)
@@ -90,24 +90,24 @@ namespace NetMurmurHash3.Tests
                 offset += size;
             }
 
-            hasher.GetCurrentHash().Should().Equal(MurmurHash3x64.Hash(data));
+            hasher.GetCurrentHash().Should().Equal(MurmurHash3x64_128.Hash(data));
         }
 
         [Fact]
         public void Empty_appends_do_not_change_the_hash()
         {
-            MurmurHash3x64 hasher = new();
+            MurmurHash3x64_128 hasher = new();
             hasher.Append([]);
             hasher.Append(Pattern.AsSpan(0, 9));
             hasher.Append([]);
 
-            hasher.GetCurrentHash().Should().Equal(MurmurHash3x64.Hash(Pattern.AsSpan(0, 9)));
+            hasher.GetCurrentHash().Should().Equal(MurmurHash3x64_128.Hash(Pattern.AsSpan(0, 9)));
         }
 
         [Fact]
         public void GetCurrentHash_does_not_alter_state()
         {
-            MurmurHash3x64 hasher = new();
+            MurmurHash3x64_128 hasher = new();
             hasher.Append(Pattern.AsSpan(0, 20));
 
             byte[] first = hasher.GetCurrentHash();
@@ -115,21 +115,21 @@ namespace NetMurmurHash3.Tests
             hasher.Append(Pattern.AsSpan(20, 13));
 
             second.Should().Equal(first);
-            first.Should().Equal(MurmurHash3x64.Hash(Pattern.AsSpan(0, 20)));
-            hasher.GetCurrentHash().Should().Equal(MurmurHash3x64.Hash(Pattern.AsSpan(0, 33)));
+            first.Should().Equal(MurmurHash3x64_128.Hash(Pattern.AsSpan(0, 20)));
+            hasher.GetCurrentHash().Should().Equal(MurmurHash3x64_128.Hash(Pattern.AsSpan(0, 33)));
         }
 
         [Fact]
         public void Fresh_hasher_returns_empty_input_hash()
         {
-            new MurmurHash3x64().GetCurrentHash().Should().Equal(MurmurHash3x64.Hash([]));
+            new MurmurHash3x64_128().GetCurrentHash().Should().Equal(MurmurHash3x64_128.Hash([]));
         }
 
         [Fact]
         public void Trailing_zero_bytes_change_the_hash()
         {
             // Length is mixed into finalization, so zero padding must not collide.
-            MurmurHash3x64.Hash(new byte[5]).Should().NotEqual(MurmurHash3x64.Hash(new byte[6]));
+            MurmurHash3x64_128.Hash(new byte[5]).Should().NotEqual(MurmurHash3x64_128.Hash(new byte[6]));
         }
     }
 }

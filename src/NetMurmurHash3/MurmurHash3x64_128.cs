@@ -7,7 +7,7 @@ namespace NetMurmurHash3;
 /// <summary>
 /// Incremental MurmurHash3 x64_128 (default seed 0). Output is h1 then h2, each little-endian, matching the reference byte order.
 /// </summary>
-public sealed class MurmurHash3x64 : NonCryptographicHashAlgorithm
+public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
 {
     private new const int HashLengthInBytes = 16;
 
@@ -21,7 +21,7 @@ public sealed class MurmurHash3x64 : NonCryptographicHashAlgorithm
     private ulong _length;
     private readonly uint _seed;
 
-    public MurmurHash3x64(uint seed = 0) : base(HashLengthInBytes)
+    public MurmurHash3x64_128(uint seed = 0) : base(HashLengthInBytes)
     {
         _seed = seed;
         Reset();
@@ -29,7 +29,7 @@ public sealed class MurmurHash3x64 : NonCryptographicHashAlgorithm
 
     public static byte[] Hash(ReadOnlySpan<byte> data, uint seed = 0)
     {
-        MurmurHash3x64 hasher = new(seed);
+        MurmurHash3x64_128 hasher = new(seed);
         hasher.Append(data);
         return hasher.GetCurrentHash();
     }
