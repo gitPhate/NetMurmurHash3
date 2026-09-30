@@ -76,6 +76,36 @@ namespace NetMurmurHash3.Tests
         }
 
         [Fact]
+        public void Incremental_single_append_matches_one_shot_for_every_length()
+        {
+            for (int length = 0; length <= Pattern.Length; length++)
+            {
+                MurmurHash3x64_128 hasher = new(42);
+                hasher.Append(Pattern.AsSpan(0, length));
+
+                hasher.GetCurrentHash().Should().Equal(MurmurHash3x64_128.Hash(Pattern.AsSpan(0, length), 42), $"length {length}");
+            }
+        }
+
+        [Fact]
+        public void Hash_allocates_only_the_result_array()
+        {
+            byte[] data = TestData.Bytes(100);
+            MurmurHash3x64_128.Hash(data);
+
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            byte[] hash = MurmurHash3x64_128.Hash(data);
+            long hashAllocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+            before = GC.GetAllocatedBytesForCurrentThread();
+            byte[] array = new byte[hash.Length];
+            long arrayAllocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+            hashAllocated.Should().Be(arrayAllocated);
+            GC.KeepAlive(array);
+        }
+
+        [Fact]
         public void Incremental_append_in_random_chunks_matches_one_shot()
         {
             byte[] data = TestData.Bytes(5000);

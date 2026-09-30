@@ -29,9 +29,14 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
 
     public static byte[] Hash(ReadOnlySpan<byte> data, uint seed = 0)
     {
-        MurmurHash3x64_128 hasher = new(seed);
-        hasher.Append(data);
-        return hasher.GetCurrentHash();
+        ulong h1 = seed;
+        ulong h2 = seed;
+        int blocksLength = data.Length & ~(HashLengthInBytes - 1);
+        MixBlocks(data.Slice(0, blocksLength), ref h1, ref h2);
+
+        byte[] hash = new byte[HashLengthInBytes];
+        Finish(h1, h2, data.Slice(blocksLength), (ulong)data.Length, hash);
+        return hash;
     }
 
     public override void Append(ReadOnlySpan<byte> data)
@@ -70,12 +75,11 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
         _length = 0;
     }
 
-    protected override void GetCurrentHashCore(Span<byte> destination)
-    {
-        ulong h1 = _h1;
-        ulong h2 = _h2;
-        ReadOnlySpan<byte> tail = _pending.AsSpan(0, _pendingCount);
+    protected override void GetCurrentHashCore(Span<byte> destination) =>
+        Finish(_h1, _h2, _pending.AsSpan(0, _pendingCount), _length, destination);
 
+    private static void Finish(ulong h1, ulong h2, ReadOnlySpan<byte> tail, ulong length, Span<byte> destination)
+    {
         ulong k1 = 0;
         ulong k2 = 0;
         for (int i = tail.Length - 1; i >= 8; i--)
@@ -96,8 +100,8 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
             h1 ^= MixK1(k1);
         }
 
-        h1 ^= _length;
-        h2 ^= _length;
+        h1 ^= length;
+        h2 ^= length;
         h1 += h2;
         h2 += h1;
         h1 = FMix(h1);
