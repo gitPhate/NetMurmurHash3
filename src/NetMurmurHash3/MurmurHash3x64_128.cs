@@ -9,6 +9,10 @@ namespace NetMurmurHash3;
 /// <summary>
 /// Incremental MurmurHash3 x64_128 (default seed 0). Output is h1 then h2, each little-endian, matching the reference byte order.
 /// </summary>
+/// <remarks>
+/// The total length is mixed in as 64 bits. The reference takes an <c>int</c> length, so results match it for inputs up to
+/// <see cref="int.MaxValue"/> bytes; longer incremental inputs have no reference counterpart.
+/// </remarks>
 public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
 {
     private const int HashSize = 16;
