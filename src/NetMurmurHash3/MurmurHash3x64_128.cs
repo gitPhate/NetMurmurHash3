@@ -11,7 +11,8 @@ namespace NetMurmurHash3;
 /// </summary>
 public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
 {
-    private new const int HashLengthInBytes = 16;
+    private const int HashSize = 16;
+    private const int BlockSize = 16;
 
     private const ulong C1 = 0x87c37b91114253d5UL;
     private const ulong C2 = 0x4cf5ad432745937fUL;
@@ -23,7 +24,7 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
     private ulong _length;
     private readonly uint _seed;
 
-    public MurmurHash3x64_128(uint seed = 0) : base(HashLengthInBytes)
+    public MurmurHash3x64_128(uint seed = 0) : base(HashSize)
     {
         _seed = seed;
         Reset();
@@ -33,10 +34,10 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
     {
         ulong h1 = seed;
         ulong h2 = seed;
-        int blocksLength = data.Length & ~(HashLengthInBytes - 1);
+        int blocksLength = data.Length & ~(BlockSize - 1);
         MixBlocks(data.Slice(0, blocksLength), ref h1, ref h2);
 
-        byte[] hash = new byte[HashLengthInBytes];
+        byte[] hash = new byte[HashSize];
         Finish(h1, h2, data.Slice(blocksLength), (ulong)data.Length, hash);
         return hash;
     }
@@ -47,12 +48,12 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
 
         if (_pendingCount > 0)
         {
-            int take = Math.Min(HashLengthInBytes - _pendingCount, data.Length);
+            int take = Math.Min(BlockSize - _pendingCount, data.Length);
             data.Slice(0, take).CopyTo(_pending[_pendingCount..]);
             _pendingCount += take;
             data = data.Slice(take);
 
-            if (_pendingCount < HashLengthInBytes)
+            if (_pendingCount < BlockSize)
             {
                 return;
             }
@@ -61,7 +62,7 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
             _pendingCount = 0;
         }
 
-        int blocksLength = data.Length & ~(HashLengthInBytes - 1);
+        int blocksLength = data.Length & ~(BlockSize - 1);
         MixBlocks(data.Slice(0, blocksLength), ref _h1, ref _h2);
         data = data.Slice(blocksLength);
 
@@ -112,7 +113,7 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
         ulong h2 = h2State;
 
         ref byte block = ref MemoryMarshal.GetReference(blocks);
-        ref byte end = ref Unsafe.Add(ref block, blocks.Length & ~(HashLengthInBytes - 1));
+        ref byte end = ref Unsafe.Add(ref block, blocks.Length & ~(BlockSize - 1));
 
         while (Unsafe.IsAddressLessThan(ref block, ref end))
         {
@@ -134,7 +135,7 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
             h2 += h1;
             h2 = h2 * 5 + 0x38495ab5;
 
-            block = ref Unsafe.Add(ref block, HashLengthInBytes);
+            block = ref Unsafe.Add(ref block, BlockSize);
         }
 
         h1State = h1;
@@ -155,7 +156,7 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
         return k;
     }
 
-    [InlineArray(HashLengthInBytes)]
+    [InlineArray(BlockSize)]
     private struct BlockBuffer
     {
         private byte _element0;
