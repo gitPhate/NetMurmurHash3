@@ -50,15 +50,13 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
                 return;
             }
 
-            MixBlock(_pending);
+            MixBlocks(_pending, ref _h1, ref _h2);
             _pendingCount = 0;
         }
 
-        while (data.Length >= HashLengthInBytes)
-        {
-            MixBlock(data);
-            data = data.Slice(HashLengthInBytes);
-        }
+        int blocksLength = data.Length & ~(HashLengthInBytes - 1);
+        MixBlocks(data.Slice(0, blocksLength), ref _h1, ref _h2);
+        data = data.Slice(blocksLength);
 
         data.CopyTo(_pending);
         _pendingCount = data.Length;
@@ -111,20 +109,32 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
         BinaryPrimitives.WriteUInt64LittleEndian(destination.Slice(8), h2);
     }
 
-    private void MixBlock(ReadOnlySpan<byte> block)
+    // Works on locals so the JIT keeps the state in registers for the whole loop instead of round-tripping through fields.
+    private static void MixBlocks(ReadOnlySpan<byte> blocks, ref ulong h1State, ref ulong h2State)
     {
-        ulong k1 = BinaryPrimitives.ReadUInt64LittleEndian(block);
-        ulong k2 = BinaryPrimitives.ReadUInt64LittleEndian(block.Slice(8));
+        ulong h1 = h1State;
+        ulong h2 = h2State;
 
-        _h1 ^= MixK1(k1);
-        _h1 = BitOperations.RotateLeft(_h1, 27);
-        _h1 += _h2;
-        _h1 = _h1 * 5 + 0x52dce729;
+        while (blocks.Length >= HashLengthInBytes)
+        {
+            ulong k1 = BinaryPrimitives.ReadUInt64LittleEndian(blocks);
+            ulong k2 = BinaryPrimitives.ReadUInt64LittleEndian(blocks.Slice(8));
 
-        _h2 ^= MixK2(k2);
-        _h2 = BitOperations.RotateLeft(_h2, 31);
-        _h2 += _h1;
-        _h2 = _h2 * 5 + 0x38495ab5;
+            h1 ^= MixK1(k1);
+            h1 = BitOperations.RotateLeft(h1, 27);
+            h1 += h2;
+            h1 = h1 * 5 + 0x52dce729;
+
+            h2 ^= MixK2(k2);
+            h2 = BitOperations.RotateLeft(h2, 31);
+            h2 += h1;
+            h2 = h2 * 5 + 0x38495ab5;
+
+            blocks = blocks.Slice(HashLengthInBytes);
+        }
+
+        h1State = h1;
+        h2State = h2;
     }
 
     private static ulong MixK1(ulong k1) => BitOperations.RotateLeft(k1 * C1, 31) * C2;
