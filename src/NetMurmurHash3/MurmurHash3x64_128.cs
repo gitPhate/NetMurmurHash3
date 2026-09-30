@@ -16,7 +16,7 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
     private const ulong C1 = 0x87c37b91114253d5UL;
     private const ulong C2 = 0x4cf5ad432745937fUL;
 
-    private readonly byte[] _pending = new byte[HashLengthInBytes];
+    private PendingBlock _pending;
     private int _pendingCount;
     private ulong _h1;
     private ulong _h2;
@@ -48,7 +48,7 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
         if (_pendingCount > 0)
         {
             int take = Math.Min(HashLengthInBytes - _pendingCount, data.Length);
-            data.Slice(0, take).CopyTo(_pending.AsSpan(_pendingCount));
+            data.Slice(0, take).CopyTo(_pending[_pendingCount..]);
             _pendingCount += take;
             data = data.Slice(take);
 
@@ -78,7 +78,7 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
     }
 
     protected override void GetCurrentHashCore(Span<byte> destination) =>
-        Finish(_h1, _h2, _pending.AsSpan(0, _pendingCount), _length, destination);
+        Finish(_h1, _h2, _pending[.._pendingCount], _length, destination);
 
     private static void Finish(ulong h1, ulong h2, ReadOnlySpan<byte> tail, ulong length, Span<byte> destination)
     {
@@ -163,5 +163,11 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
         k *= 0xc4ceb9fe1a85ec53UL;
         k ^= k >> 33;
         return k;
+    }
+
+    [InlineArray(HashLengthInBytes)]
+    private struct PendingBlock
+    {
+        private byte _element0;
     }
 }
