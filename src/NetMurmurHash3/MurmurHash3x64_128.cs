@@ -1,6 +1,8 @@
 ﻿using System.Buffers.Binary;
 using System.IO.Hashing;
 using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace NetMurmurHash3;
 
@@ -119,10 +121,18 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
         ulong h1 = h1State;
         ulong h2 = h2State;
 
-        while (blocks.Length >= HashLengthInBytes)
+        ref byte block = ref MemoryMarshal.GetReference(blocks);
+        ref byte end = ref Unsafe.Add(ref block, blocks.Length & ~(HashLengthInBytes - 1));
+
+        while (Unsafe.IsAddressLessThan(ref block, ref end))
         {
-            ulong k1 = BinaryPrimitives.ReadUInt64LittleEndian(blocks);
-            ulong k2 = BinaryPrimitives.ReadUInt64LittleEndian(blocks.Slice(8));
+            ulong k1 = Unsafe.ReadUnaligned<ulong>(ref block);
+            ulong k2 = Unsafe.ReadUnaligned<ulong>(ref Unsafe.Add(ref block, 8));
+            if (!BitConverter.IsLittleEndian)
+            {
+                k1 = BinaryPrimitives.ReverseEndianness(k1);
+                k2 = BinaryPrimitives.ReverseEndianness(k2);
+            }
 
             h1 ^= MixK1(k1);
             h1 = BitOperations.RotateLeft(h1, 27);
@@ -134,7 +144,7 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
             h2 += h1;
             h2 = h2 * 5 + 0x38495ab5;
 
-            blocks = blocks.Slice(HashLengthInBytes);
+            block = ref Unsafe.Add(ref block, HashLengthInBytes);
         }
 
         h1State = h1;
