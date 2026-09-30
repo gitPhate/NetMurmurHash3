@@ -16,7 +16,7 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
     private const ulong C1 = 0x87c37b91114253d5UL;
     private const ulong C2 = 0x4cf5ad432745937fUL;
 
-    private PendingBlock _pending;
+    private BlockBuffer _pending;
     private int _pendingCount;
     private ulong _h1;
     private ulong _h2;
@@ -82,16 +82,11 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
 
     private static void Finish(ulong h1, ulong h2, ReadOnlySpan<byte> tail, ulong length, Span<byte> destination)
     {
-        ulong k1 = 0;
-        ulong k2 = 0;
-        for (int i = tail.Length - 1; i >= 8; i--)
-        {
-            k2 = (k2 << 8) | tail[i];
-        }
-        for (int i = Math.Min(tail.Length, 8) - 1; i >= 0; i--)
-        {
-            k1 = (k1 << 8) | tail[i];
-        }
+        // Zero padding reproduces the reference's byte-by-byte tail assembly.
+        BlockBuffer padded = default;
+        tail.CopyTo(padded);
+        ulong k1 = BinaryPrimitives.ReadUInt64LittleEndian(padded);
+        ulong k2 = BinaryPrimitives.ReadUInt64LittleEndian(padded[8..]);
 
         // MixK1(0) == MixK2(0) == 0, so absent tail lanes are no-ops and need no branch.
         h2 ^= MixK2(k2);
@@ -161,7 +156,7 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
     }
 
     [InlineArray(HashLengthInBytes)]
-    private struct PendingBlock
+    private struct BlockBuffer
     {
         private byte _element0;
     }

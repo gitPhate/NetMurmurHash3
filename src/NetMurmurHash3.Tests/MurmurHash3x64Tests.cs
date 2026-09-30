@@ -40,9 +40,19 @@ namespace NetMurmurHash3.Tests
         // Lengths cover every tail branch (0, 1..8, 9..15) with zero, one and several full 16-byte blocks.
         [Theory]
         [InlineData(1, "17BD72899D9027C4DD99B1452A70155C")]
+        [InlineData(2, "90F5777B245DAABCEED7327FC8E89B2B")]
+        [InlineData(3, "3BA2A04DDA6EFF33FB3A3CD98B5E905F")]
+        [InlineData(4, "B4A3373991951133661D61DB45082E64")]
+        [InlineData(5, "0FE0388754324363FC8AAD335C8E3605")]
+        [InlineData(6, "40C1D5AA6D24B772368D240CEF8C7412")]
         [InlineData(7, "1CB9D9C2FCFD143F4F20F19810FDEB01")]
         [InlineData(8, "5DAFA33E0C1327D932687EFBB44CABEE")]
         [InlineData(9, "E43BFBFBF3430F32A2F746D02D1773A3")]
+        [InlineData(10, "97807E5E9D5B19FA4A8ECD4E4343B0D3")]
+        [InlineData(11, "12E7EC2E20449A091DFDBE3CCD1F4C43")]
+        [InlineData(12, "04BFEFF933C9F046F508E142FC4C994D")]
+        [InlineData(13, "C4B3B087C7C6B8E5A7C012FD52D1FFB5")]
+        [InlineData(14, "D58692FD93BB2E67060C595ACCD4A615")]
         [InlineData(15, "17AB8267B5F475375E412BB1809D296C")]
         [InlineData(16, "14DA89F6EB796B468A8505B8028B548C")]
         [InlineData(17, "24E59D30842F32EB1B4828271FA02A08")]
@@ -121,6 +131,18 @@ namespace NetMurmurHash3.Tests
             }
 
             hasher.GetCurrentHash().Should().Equal(MurmurHash3x64_128.Hash(data));
+        }
+
+        [Fact]
+        public void Stale_pending_bytes_do_not_leak_into_the_tail()
+        {
+            // 15 + 1 fills and flushes the pending block, leaving its old bytes behind; the 2-byte tail must ignore them.
+            MurmurHash3x64_128 hasher = new();
+            hasher.Append(Pattern.AsSpan(0, 15));
+            hasher.Append(Pattern.AsSpan(15, 1));
+            hasher.Append(Pattern.AsSpan(16, 2));
+
+            Hex(hasher.GetCurrentHash()).Should().Be("9E5F2E48DA90B244F61BCD23380AC584");
         }
 
         [Fact]
