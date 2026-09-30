@@ -93,14 +93,9 @@ public sealed class MurmurHash3x64_128 : NonCryptographicHashAlgorithm
             k1 = (k1 << 8) | tail[i];
         }
 
-        if (tail.Length > 8)
-        {
-            h2 ^= MixK2(k2);
-        }
-        if (tail.Length > 0)
-        {
-            h1 ^= MixK1(k1);
-        }
+        // MixK1(0) == MixK2(0) == 0, so absent tail lanes are no-ops and need no branch.
+        h2 ^= MixK2(k2);
+        h1 ^= MixK1(k1);
 
         h1 ^= length;
         h2 ^= length;
