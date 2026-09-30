@@ -103,34 +103,51 @@ public sealed class MurmurHash3x86_32 : NonCryptographicHashAlgorithm
     }
 
     /// <summary>Returns h1; writing it little-endian yields the <see cref="NonCryptographicHashAlgorithm.GetCurrentHash()"/> bytes.</summary>
-    public uint GetCurrentHashAsUInt32() => Finish(_h1, _pending[.._pendingCount], _length);
+    public uint GetCurrentHashAsUInt32() => Finish(_h1, ref _pending[0], _pendingCount, _length);
 
     protected override void GetCurrentHashCore(Span<byte> destination) =>
         BinaryPrimitives.WriteUInt32LittleEndian(destination, GetCurrentHashAsUInt32());
 
+    // Refs instead of Slice and indexing: the bounds checks and their throw paths cost more than the hashing on short inputs.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static uint HashCore(ReadOnlySpan<byte> source, uint seed)
     {
         uint h1 = seed;
-        int blocksLength = source.Length & ~(BlockSize - 1);
-        MixBlocks(source.Slice(0, blocksLength), ref h1);
+        MixBlocks(source, ref h1);
 
-        return Finish(h1, source.Slice(blocksLength), (ulong)source.Length);
+        int blocksLength = source.Length & ~(BlockSize - 1);
+        ref byte tail = ref Unsafe.Add(ref MemoryMarshal.GetReference(source), blocksLength);
+        return Finish(h1, ref tail, source.Length - blocksLength, (ulong)source.Length);
     }
 
-    private static uint Finish(uint h1, ReadOnlySpan<byte> tail, ulong length)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static uint Finish(uint h1, ref byte tail, int tailLength, ulong length)
     {
-        // Zero padding reproduces the reference's byte-by-byte tail assembly.
-        BlockBuffer padded = default;
-        tail.CopyTo(padded);
+        // The tail is at most 3 bytes, so assembling it byte by byte is cheaper than zero-padding a block. Mixing only a
+        // non-empty tail keeps MixK1's two multiplies off the critical path when the input is a whole number of blocks.
+        if (tailLength > 0)
+        {
+            uint k1 = tail;
+            if (tailLength > 1)
+            {
+                k1 ^= (uint)Unsafe.Add(ref tail, 1) << 8;
+            }
 
-        // MixK1(0) == 0, so an absent tail is a no-op and needs no branch.
-        h1 ^= MixK1(BinaryPrimitives.ReadUInt32LittleEndian(padded));
+            if (tailLength > 2)
+            {
+                k1 ^= (uint)Unsafe.Add(ref tail, 2) << 16;
+            }
+
+            h1 ^= MixK1(k1);
+        }
 
         h1 ^= (uint)length;
         return FMix(h1);
     }
 
+    // Mixes only the whole blocks; a trailing partial block is ignored.
     // Works on a local so the JIT keeps the state in a register for the whole loop instead of round-tripping through a field.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void MixBlocks(ReadOnlySpan<byte> blocks, ref uint h1State)
     {
         uint h1 = h1State;
@@ -156,8 +173,10 @@ public sealed class MurmurHash3x86_32 : NonCryptographicHashAlgorithm
         h1State = h1;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static uint MixK1(uint k1) => BitOperations.RotateLeft(k1 * C1, 15) * C2;
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static uint FMix(uint h)
     {
         h ^= h >> 16;
