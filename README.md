@@ -80,3 +80,8 @@ JeremyEspresso's code is compiled into the benchmark project rather than referen
 | NetMurmurHash3           | 1048576 | 122,897.052 ns |  1.00 |      40 B |
 | DarrenKopp_Murmur128_x64 | 1048576 | 398,543.178 ns |  3.24 |     144 B |
 | XxHash128_reference      | 1048576 |  36,995.998 ns |  0.30 |      40 B |
+
+## History
+This project is born because Claude accidentally created an implementation of the x64_128 version of the algorithm while I was working for another project, because the base class implementation `NonCryptographicHashAlgorithm` was needed.
+
+I then decided to expand it and create a separated project for that, which turned out to be super fast.
