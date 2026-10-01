@@ -85,3 +85,5 @@ JeremyEspresso's code is compiled into the benchmark project rather than referen
 This project is born because Claude accidentally created an implementation of the x64_128 version of the algorithm while I was working for another project, because the base class implementation `NonCryptographicHashAlgorithm` was needed.
 
 I then decided to expand it and create a separated project for that, which turned out to be super fast.
+
+**AI Disclaimer:** _This repo is 100% vibe-coded by Claude Code._
