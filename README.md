@@ -1,5 +1,7 @@
 # NetMurmurHash3
 
+[![NuGet](https://img.shields.io/nuget/v/NetMurmurHash3)](https://www.nuget.org/packages/NetMurmurHash3)
+
 MurmurHash3 for .NET 8 and .NET 10, with an API modeled on `System.IO.Hashing` (`XxHash32`, `XxHash128`).
 
 | Class | Variant | Output |
